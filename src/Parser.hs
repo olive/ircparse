@@ -56,7 +56,7 @@ pLine = (,) <$> (choice [ pDate
 
 pRelTime   =                  RRelTime   <$> pInt
 pComment   = char '#'     *> (RComment   <$> pRestOfLine)
-pNick      = char '>'     *> (RNick      <$> pManyNoSpace)
+pNick      = char ':'     *> (RNick      <$> pManyNoSpace)
 pCommand   = char '/'     *> (RCommand   <$> choice [ CJoin <$> (string "join" *> spaces *> pManyNoSpace) <* pRestOfLine
                                                     , CQuit <$> (string "quit" *> spaces *> pManyNoSpace)
                                                             <*> option "" (char ' ' *> pRestOfLine)
@@ -68,8 +68,8 @@ pCommand   = char '/'     *> (RCommand   <$> choice [ CJoin <$> (string "join" *
                                                     , CMode <$> (string "mode" *> spaces *> pManyNoSpace)
                                                             <*> (spaces *> pManyNoSpace)
                                                             <*> (spaces *> pManyNoSpace) <* pRestOfLine ])
-pPMReceive = string "<-"  *> (RPMReceive <$> pRestOfLine)
-pPMSend    = string "->"  *> (RPMSend    <$> pRestOfLine)
+pPMReceive = char '<'     *> (RPMReceive <$> pManyNoSpace)   -- TODO: update to new syntax
+pPMSend    = char '>'     *> (RPMSend    <$> pManyNoSpace)
 pSystem    = char '$'     *> (RSystem    <$> pRestOfLine)
 pAction    = char '*'     *> (RAction    <$> pRestOfLine)
 pText      = string "  "  *> (RText      <$> pRestOfLine)

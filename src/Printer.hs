@@ -43,8 +43,15 @@ showLine (Line time event) = case event of
                                 , ": No such nick/channel" ]
     Censored         -> unwords [ showTimeStamp time
                                 , "-!- #bunbun Cannot send to channel (your message contained a censored word)" ]
-    PMReceive _ _ -> "" -- TODO
-    PMSend _ _ -> ""    -- TODO
+    PMReceive nick m -> unwords [ showTimeStamp time
+                                , "-!-"
+                                , nick
+                                , "says:"
+                                , m ]
+    PMSend    nick m -> unwords [ showTimeStamp time
+                                , "-!- tell"
+                                , nick ++ ":"
+                                , m ]
     Mode ni mod hos  -> unwords [ showTimeStamp time
                                 , "-!-"
                                 , "mode/#bunbun"

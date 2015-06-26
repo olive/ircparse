@@ -35,14 +35,16 @@ processRawLines rl = (reverse lines, reverse $ ircWarnings st')
             (newLs, st') -> (newLs ++ ls, st')
         (lines, st') = foldl processFun ([], defaultIRCState) rl
 
+data PMState = PMNone | PMIsSend | PMIsReceive
+
 data IRCState = IRCState { ircTime       :: UTCTime
                          , ircSpeaker    :: Nick
-                         , ircPmNick     :: Nick
+                         , ircPMState    :: PMState
                          , ircWasReceive :: Bool
                          , ircWarnings   :: [Warning] }
 
 defaultIRCState :: IRCState
-defaultIRCState = IRCState defaultTime "" "" False []
+defaultIRCState = IRCState defaultTime "" PMNone False []
 
 processRawLine :: IRCState -> (RawLine, Int) -> ([Line], IRCState)
 processRawLine st (rl, ln) = case rl of
@@ -53,8 +55,12 @@ processRawLine st (rl, ln) = case rl of
         GT -> ([Line newTime DateChange], st { ircTime = newTime, ircWarnings = TimeTravelWarning ln : ircWarnings st } )
         where oldTime   = ircTime st
               newTime   = UTCTime (fromGregorian y mo d) (secondsToDiffTime 0)
-    RText   str  -> ([Line (ircTime st) $ Message (ircSpeaker st) str], st)
-    RNick str    -> ([], st { ircSpeaker = str } )
+    RText   str  -> ([Line (ircTime st) $ event (ircSpeaker st) str], st)
+        where event = case ircPMState st of
+                  PMNone      -> Message
+                  PMIsReceive -> PMReceive
+                  PMIsSend    -> PMSend
+    RNick str    -> ([], st { ircSpeaker = str, ircPMState = PMNone } )
     RTime h m pm -> (if (dayTime' - dayTime) > 0 then [] else [Line newTime DateChange], st { ircTime = newTime } )
         where oldTime@(UTCTime day dayTime) = ircTime st
               dayTime'  = secondsToDiffTime $ fromIntegral (3600 * h + 60 * m + if pm then 12 * 3600 else 0)
@@ -73,8 +79,8 @@ processRawLine st (rl, ln) = case rl of
         CCensored        -> ([Line (ircTime st)   Censored], st)
         CMode ni mod hos -> ([Line (ircTime st) $ Mode ni mod hos], st)
         -- TODO: hostnames
-    RPMReceive str -> ([], st) -- TODO
-    RPMSend str  -> ([], st) -- TODO
+    RPMReceive n -> ([], st { ircSpeaker = n, ircPMState = PMIsReceive } )
+    RPMSend n    -> ([], st { ircSpeaker = n, ircPMState = PMIsSend } )
     RSnip        -> ([Snip], st)
     RSystem str  -> ([], st) -- TODO
     REmpty       -> ([], st)
