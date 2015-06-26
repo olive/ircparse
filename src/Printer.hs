@@ -19,8 +19,31 @@ showLine (Line time event) = case event of
     Message nick str -> unwords [ showTimeStamp time
                                 , showSpeaker nick
                                 , str ]
+    Join nick hostna -> unwords [ showTimeStamp time
+                                , "-!-"
+                                , nick
+                                , "[" ++ hostna ++ "]"
+                                , "has joined #bunbun" ]
+    Quit nick host q -> unwords [ showTimeStamp time
+                                , "-!-"
+                                , nick
+                                , "[" ++ host ++ "]"
+                                , "has quit #bunbun"
+                                , "[Quit:"
+                                , q ++ "]" ]
+        -- TODO: parameterize channel name
+    NickChange ol ne -> unwords [ showTimeStamp time
+                                , "-!-"
+                                , ol
+                                , "is now known as"
+                                , ne ]
+    Censored         -> unwords [ showTimeStamp time
+                                , "-!- #bunbun Cannot send to channel (your message contained a censored word)" ]
+    PMReceive _ _ -> ""
+    PMSend _ _ -> ""
     DateChange       -> formatTime defaultTimeLocale "--- Day changed %a %b %d %Y" time
-    _                -> ""
+    LogOpen          -> formatTime defaultTimeLocale "--- Log opened %a %b %d %H:%M:%S %Y" time
+    LogClose         -> formatTime defaultTimeLocale "--- Log closed %a %b %d %H:%M:%S %Y" time
 
 showSpeaker :: Nick -> String
 showSpeaker n = concat ["< ", n, ">"]
