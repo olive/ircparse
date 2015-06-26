@@ -11,20 +11,22 @@ defaultTime = UTCTime (fromGregorian 1970 1 1) (secondsToDiffTime 0)
 data Line = Line UTCTime Event
           | Snip
 
+type Nick     = String
+type Hostname = String
+
 data Event = Message Nick String
            | Action  Nick String
            | DateChange
            | Join    Nick Hostname
            | Quit    Nick Hostname String
            | NickChange Nick Nick
+           | NoNick Nick
            | Censored
            | PMReceive Nick String
            | PMSend Nick String
            | LogClose
            | LogOpen
-
-type Nick     = String
-type Hostname = String
+           | Mode Nick String Hostname
 
 processRawLines :: [(RawLine, Int)] -> ([Line], [Warning])
 processRawLines rl = (reverse lines, reverse $ ircWarnings st')
@@ -63,7 +65,14 @@ processRawLine st (rl, ln) = case rl of
         where oldTime = ircTime st
               newTime = addUTCTime (fromIntegral $ int * 60) oldTime
               dayDiff = diffDays (utctDay newTime) (utctDay oldTime)
-    RCommand str -> ([], st) -- TODO
+    RCommand cmd -> case cmd of
+        CJoin nick       -> ([Line (ircTime st) $ Join nick "unknown@unknown"], st)
+        CQuit nick msg   -> ([Line (ircTime st) $ Quit nick "unknown@unknown" msg], st)
+        CNick nick nick' -> ([Line (ircTime st) $ NickChange nick nick'], st)
+        CNoNick nick     -> ([Line (ircTime st) $ NoNick nick], st)
+        CCensored        -> ([Line (ircTime st)   Censored], st)
+        CMode ni mod hos -> ([Line (ircTime st) $ Mode ni mod hos], st)
+        -- TODO: hostnames
     RPMReceive str -> ([], st) -- TODO
     RPMSend str  -> ([], st) -- TODO
     RSnip        -> ([Snip], st)

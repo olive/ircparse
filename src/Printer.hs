@@ -30,17 +30,27 @@ showLine (Line time event) = case event of
                                 , "[" ++ host ++ "]"
                                 , "has quit #bunbun"
                                 , "[Quit:"
-                                , q ++ "]" ]
+                                , if q /= "" then q else "quit" ++ "]" ]
         -- TODO: parameterize channel name
     NickChange ol ne -> unwords [ showTimeStamp time
                                 , "-!-"
                                 , ol
                                 , "is now known as"
                                 , ne ]
+    NoNick nick      -> unwords [ showTimeStamp time
+                                , "-!-"
+                                , nick
+                                , ": No such nick/channel" ]
     Censored         -> unwords [ showTimeStamp time
                                 , "-!- #bunbun Cannot send to channel (your message contained a censored word)" ]
     PMReceive _ _ -> "" -- TODO
     PMSend _ _ -> ""    -- TODO
+    Mode ni mod hos  -> unwords [ showTimeStamp time
+                                , "-!-"
+                                , "mode/#bunbun"
+                                , "[" ++ mod ++ hos ++ "]"
+                                , "by"
+                                , ni ]
     DateChange       -> formatTime defaultTimeLocale "--- Day changed %a %b %d %Y" time
     LogOpen          -> formatTime defaultTimeLocale "--- Log opened %a %b %d %H:%M:%S %Y" time
     LogClose         -> formatTime defaultTimeLocale "--- Log closed %a %b %d %H:%M:%S %Y" time
