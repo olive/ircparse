@@ -5,11 +5,6 @@ import Data.Time
 
 import Parser
 
--- log_close_string = --- Log closed %a %b %d %H:%M:%S %Y
--- log_timestamp    = %H:%M
--- log_day_changed  = --- Day changed %a %b %d %Y
--- log_open_string  = --- Log opened %a %b %d %H:%M:%S %Y
-
 defaultTime :: UTCTime
 defaultTime = UTCTime (fromGregorian 1970 1 1) (secondsToDiffTime 0)
 

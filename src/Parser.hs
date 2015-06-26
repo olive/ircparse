@@ -12,7 +12,7 @@ import Text.Parsec.String
 parseToRawLines :: String -> String -> Either ParseError [(RawLine, Int)]
 parseToRawLines = parse pFile
 
-data RawLine = RAction String       -- check
+data RawLine = RAction String
              | RCommand String
              | RComment String
              | RDate Int Int Integer -- Month Day Year

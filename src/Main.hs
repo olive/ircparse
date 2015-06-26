@@ -13,5 +13,6 @@ main = do
         Right rawLines   -> do
             let (lines, warnings) = processRawLines rawLines
             putStr . showLines $ lines
-            -- TODO: print warnings
+            putStrLn "\n\n\n"
+            putStr . showWarnings $ warnings
         Left  parseError -> print parseError

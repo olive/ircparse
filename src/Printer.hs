@@ -39,8 +39,8 @@ showLine (Line time event) = case event of
                                 , ne ]
     Censored         -> unwords [ showTimeStamp time
                                 , "-!- #bunbun Cannot send to channel (your message contained a censored word)" ]
-    PMReceive _ _ -> ""
-    PMSend _ _ -> ""
+    PMReceive _ _ -> "" -- TODO
+    PMSend _ _ -> ""    -- TODO
     DateChange       -> formatTime defaultTimeLocale "--- Day changed %a %b %d %Y" time
     LogOpen          -> formatTime defaultTimeLocale "--- Log opened %a %b %d %H:%M:%S %Y" time
     LogClose         -> formatTime defaultTimeLocale "--- Log closed %a %b %d %H:%M:%S %Y" time
@@ -50,3 +50,9 @@ showSpeaker n = concat ["< ", n, ">"]
 
 showTimeStamp :: UTCTime -> String
 showTimeStamp = formatTime defaultTimeLocale "%H:%M"
+
+showWarnings :: [Warning] -> String
+showWarnings = unlines . map showWarning
+
+showWarning :: Warning -> String
+showWarning (TimeTravelWarning line) = "WARNING: time travel detected around line " ++ show line
