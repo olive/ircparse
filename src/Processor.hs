@@ -57,14 +57,22 @@ processRawLine st (rl, ln) = case rl of
         where oldTime   = ircTime st
               newTime   = UTCTime (fromGregorian y mo d) (secondsToDiffTime 0)
     RText   str  -> ([Line (ircTime st) $ Message (ircSpeaker st) str], st)
+    RNick str    -> ([], st { ircSpeaker = str } )
+    RTime h m pm -> (if (dayTime' - dayTime) > 0 then [] else [Line newTime DateChange], st { ircTime = newTime } )
+        where oldTime@(UTCTime day dayTime) = ircTime st
+              dayTime'  = secondsToDiffTime $ fromIntegral (3600 * h + 60 * m + if pm then 12 * 3600 else 0)
+              newTime   = if (dayTime' - dayTime) > 0
+                  then UTCTime day dayTime'
+                  else UTCTime (addDays 1 day) dayTime'
+    RRelTime int -> (if dayDiff == 0 then [] else [Line newTime DateChange], st { ircTime = newTime } )
+        where oldTime = ircTime st
+              newTime = addUTCTime (fromIntegral $ int * 60) oldTime
+              dayDiff = diffDays (utctDay newTime) (utctDay oldTime)
     RCommand str -> ([], st) -- TODO
-    RNick str    -> ([], st) -- TODO
     RPMReceive str -> ([], st) -- TODO
     RPMSend str  -> ([], st) -- TODO
-    RRelTime int -> ([], st) -- TODO
     RSnip        -> ([Snip], st)
     RSystem str  -> ([], st) -- TODO
-    RTime h m pm -> ([], st) -- TODO
     REmpty       -> ([], st)
     RComment _   -> ([], st)
 
