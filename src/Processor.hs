@@ -78,11 +78,12 @@ processRawLine st (rl, ln) = case rl of
         CNoNick nick     -> ([Line (ircTime st) $ NoNick nick], st)
         CCensored        -> ([Line (ircTime st)   Censored], st)
         CMode ni mod hos -> ([Line (ircTime st) $ Mode ni mod hos], st)
+        CClose           -> ([Line (ircTime st)   LogClose], st)
+        COpen            -> ([Line (ircTime st)   LogOpen ], st)
         -- TODO: hostnames
     RPMReceive n -> ([], st { ircSpeaker = n, ircPMState = PMIsReceive } )
     RPMSend n    -> ([], st { ircSpeaker = n, ircPMState = PMIsSend } )
     RSnip        -> ([Snip], st)
-    RSystem str  -> ([], st) -- TODO
     REmpty       -> ([], st)
     RComment _   -> ([], st)
 

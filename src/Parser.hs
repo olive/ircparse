@@ -19,6 +19,8 @@ data Command = CJoin String
              | CNoNick String
              | CCensored
              | CMode String String String
+             | CClose
+             | COpen
 
 data RawLine = RAction String
              | RCommand Command
@@ -30,7 +32,6 @@ data RawLine = RAction String
              | RPMSend String
              | RRelTime Int
              | RSnip
-             | RSystem String
              | RText String
              | RTime Int Int Bool    -- Hour Minute IsPm
 
@@ -68,9 +69,10 @@ pCommand   = char '/'     *> (RCommand   <$> choice [ CJoin <$> (string "join" *
                                                     , CMode <$> (string "mode" *> spaces *> pManyNoSpace)
                                                             <*> (spaces *> pManyNoSpace)
                                                             <*> (spaces *> pManyNoSpace) <* pRestOfLine ])
-pPMReceive = char '<'     *> (RPMReceive <$> pManyNoSpace)   -- TODO: update to new syntax
+pPMReceive = char '<'     *> (RPMReceive <$> pManyNoSpace)
 pPMSend    = char '>'     *> (RPMSend    <$> pManyNoSpace)
-pSystem    = char '$'     *> (RSystem    <$> pRestOfLine)
+pSystem    = char '$'     *> (RCommand   <$> choice [ string "close" *> return CClose
+                                                    , string "open"  *> return COpen ])
 pAction    = char '*'     *> (RAction    <$> pRestOfLine)
 pText      = string "  "  *> (RText      <$> pRestOfLine)
 pDate      = char '@'     *> (RDate      <$> (pInt <* char '/')
