@@ -2,3 +2,5 @@
 dist/
 *.chat
 *.txt
+*.chattex
+*.tex

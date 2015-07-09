@@ -1,16 +1,19 @@
 module Printer
 where
 
+import Processor
+
 import Data.Time
 import System.Locale (defaultTimeLocale)
-
-import Processor
 
 showLines :: [Line] -> String
 showLines = unlines . map showLine
 
 showLine :: Line -> String
 showLine Snip              = "\n***SNIP***\n"
+showLine BeginRaw          = "\\begin{verbatim}"
+showLine EndRaw            = "\\end{verbatim}"
+showLine (Raw str)         = str
 showLine (Line time event) = case event of
     Action nick str  -> unwords [ showTimeStamp time
                                 , " *"
@@ -52,10 +55,10 @@ showLine (Line time event) = case event of
                                 , "-!- tell"
                                 , nick ++ ":"
                                 , m ]
-    Mode ni mod hos  -> unwords [ showTimeStamp time
+    Mode ni mde hos  -> unwords [ showTimeStamp time
                                 , "-!-"
                                 , "mode/#bunbun"
-                                , "[" ++ mod ++ hos ++ "]"
+                                , "[" ++ mde ++ hos ++ "]"
                                 , "by"
                                 , ni ]
     DateChange       -> formatTime defaultTimeLocale "--- Day changed %a %b %d %Y" time

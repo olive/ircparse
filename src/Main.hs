@@ -5,14 +5,34 @@ import Parser
 import Processor
 import Printer
 
+import Data.ByteString hiding (unzip, map, concatMap, length, putStr, hPutStr)
+import System.IO (utf8, IOMode(..), Handle, openFile, hSetEncoding, hPutStr) 
+
+getUtf8Handle :: FilePath -> IOMode -> IO Handle
+getUtf8Handle fp iom = do
+    file <- openFile fp iom
+    hSetEncoding file utf8
+    return file
+
+readUtf8 :: FilePath -> IO ByteString
+readUtf8 fp = do
+    file <- getUtf8Handle fp ReadMode
+    hGetContents file
+
+getRawLines :: FilePath -> IO [[(RawLine, Int)]]
+getRawLines fp = do
+    fileContents <- readUtf8 fp
+    case parseToRawLines fp fileContents of
+        Left  parseError -> print parseError >> return [[]]
+        Right rawLines   -> return rawLines
+
+writeLinesToFile :: FilePath -> [[(RawLine, Int)]] -> IO ()
+writeLinesToFile fp rawLines = do
+    handle <- getUtf8Handle fp WriteMode
+    let (ls, warnings) = unzip . map processRawLines $ rawLines
+    let outputString = concatMap showLines ls
+    hPutStr handle outputString
+    mapM_ (putStr . showWarnings) warnings
+
 main :: IO ()
-main = do
-    fileContents <- readFile "text.chat"
-    let parseResult = parseToRawLines "text.chat" fileContents
-    case parseResult of
-        Right rawLines   -> do
-            let (lines, warnings) = processRawLines rawLines
-            putStr . showLines $ lines
-            putStrLn "\n\n\n"
-            putStr . showWarnings $ warnings
-        Left  parseError -> print parseError
+main = writeLinesToFile "text.tex" =<< getRawLines "text.chattex"

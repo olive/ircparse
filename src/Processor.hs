@@ -1,15 +1,20 @@
 module Processor
 where
 
-import Data.Time
-
 import Parser
+
+import Control.Applicative
+import Control.Monad.State
+import Data.Time
 
 defaultTime :: UTCTime
 defaultTime = UTCTime (fromGregorian 1970 1 1) (secondsToDiffTime 0)
 
 data Line = Line UTCTime Event
-          | Snip
+          | Raw String
+          | BeginRaw
+          | EndRaw
+          | Snip deriving (Show)
 
 type Nick     = String
 type Hostname = String
@@ -26,14 +31,16 @@ data Event = Message Nick String
            | PMSend Nick String
            | LogClose
            | LogOpen
-           | Mode Nick String Hostname
+           | Mode Nick String Hostname deriving (Show)
 
 processRawLines :: [(RawLine, Int)] -> ([Line], [Warning])
-processRawLines rl = (reverse lines, reverse $ ircWarnings st')
+processRawLines rl = (reverse ls, reverse $ ircWarnings st')
     where
-        processFun (ls, st) rl = case processRawLine st rl of
-            (newLs, st') -> (newLs ++ ls, st')
-        (lines, st') = foldl processFun ([], defaultIRCState) rl
+        processFun :: [Line] -> (RawLine, Int) -> State IRCState [Line]
+        processFun lns rawl = do
+            newLs <- processRawLine rawl
+            return (newLs ++ lns)
+        (ls, st') = runState (foldM processFun [] rl) defaultIRCState
 
 data PMState = PMNone | PMIsSend | PMIsReceive
 
@@ -41,50 +48,77 @@ data IRCState = IRCState { ircTime       :: UTCTime
                          , ircSpeaker    :: Nick
                          , ircPMState    :: PMState
                          , ircWasReceive :: Bool
-                         , ircWarnings   :: [Warning] }
+                         , ircWarnings   :: [Warning]
+                         , ircIsRaw      :: Bool }
 
 defaultIRCState :: IRCState
-defaultIRCState = IRCState defaultTime "" PMNone False []
+defaultIRCState = IRCState defaultTime "" PMNone False [] True
 
-processRawLine :: IRCState -> (RawLine, Int) -> ([Line], IRCState)
-processRawLine st (rl, ln) = case rl of
-    RAction str  -> ([Line (ircTime st) $ Action  (ircSpeaker st) str], st)
-    RDate mo d y -> case compare oldTime newTime of
-        LT -> ([Line newTime DateChange], st { ircTime = newTime } )
-        EQ -> ([], st)
-        GT -> ([Line newTime DateChange], st { ircTime = newTime, ircWarnings = TimeTravelWarning ln : ircWarnings st } )
-        where oldTime   = ircTime st
-              newTime   = UTCTime (fromGregorian y mo d) (secondsToDiffTime 0)
-    RText   str  -> ([Line (ircTime st) $ event (ircSpeaker st) str], st)
-        where event = case ircPMState st of
-                  PMNone      -> Message
-                  PMIsReceive -> PMReceive
-                  PMIsSend    -> PMSend
-    RNick str    -> ([], st { ircSpeaker = str, ircPMState = PMNone } )
-    RTime h m pm -> (if (dayTime' - dayTime) > 0 then [] else [Line newTime DateChange], st { ircTime = newTime } )
-        where oldTime@(UTCTime day dayTime) = ircTime st
-              dayTime'  = secondsToDiffTime $ fromIntegral (3600 * h + 60 * m + if pm then 12 * 3600 else 0)
-              newTime   = if (dayTime' - dayTime) > 0
-                  then UTCTime day dayTime'
-                  else UTCTime (addDays 1 day) dayTime'
-    RRelTime int -> (if dayDiff == 0 then [] else [Line newTime DateChange], st { ircTime = newTime } )
-        where oldTime = ircTime st
-              newTime = addUTCTime (fromIntegral $ int * 60) oldTime
-              dayDiff = diffDays (utctDay newTime) (utctDay oldTime)
-    RCommand cmd -> case cmd of
-        CJoin nick       -> ([Line (ircTime st) $ Join nick "unknown@unknown"], st)
-        CQuit nick msg   -> ([Line (ircTime st) $ Quit nick "unknown@unknown" msg], st)
-        CNick nick nick' -> ([Line (ircTime st) $ NickChange nick nick'], st)
-        CNoNick nick     -> ([Line (ircTime st) $ NoNick nick], st)
-        CCensored        -> ([Line (ircTime st)   Censored], st)
-        CMode ni mod hos -> ([Line (ircTime st) $ Mode ni mod hos], st)
-        CClose           -> ([Line (ircTime st)   LogClose], st)
-        COpen            -> ([Line (ircTime st)   LogOpen ], st)
-        -- TODO: hostnames
-    RPMReceive n -> ([], st { ircSpeaker = n, ircPMState = PMIsReceive } )
-    RPMSend n    -> ([], st { ircSpeaker = n, ircPMState = PMIsSend } )
-    RSnip        -> ([Snip], st)
-    REmpty       -> ([], st)
-    RComment _   -> ([], st)
+modifyTime :: UTCTime -> State IRCState ()
+modifyTime newTime = modify (\st -> st { ircTime = newTime } )
 
-data Warning = TimeTravelWarning Int
+processRawLine :: (RawLine, Int) -> State IRCState [Line]
+processRawLine (rl, ln) = do
+    time <- gets ircTime
+    speaker <- gets ircSpeaker
+    pmState <- gets ircPMState
+    isRaw <- gets ircIsRaw
+    rawMod <- case rl of
+        RRaw _ -> if isRaw
+            then return []
+            else modify (\st -> st { ircIsRaw = True } ) >> return [EndRaw]
+        _      -> if not isRaw
+            then return []
+            else modify (\st -> st { ircIsRaw = False } ) >> return [BeginRaw]
+    ls <- case rl of
+        RAction str -> (: []) <$> ((flip Line . flip Action str) <$> gets ircSpeaker <*> gets ircTime)
+        RDate mo d y -> case compare time newTime of
+                LT -> do
+                    modifyTime newTime
+                    return [Line newTime DateChange]
+                EQ -> return []
+                GT -> do
+                    modifyTime newTime
+                    modify (\st -> st { ircWarnings = TimeTravelWarning ln : ircWarnings st } )
+                    return [Line newTime DateChange]
+            where newTime   = UTCTime (fromGregorian y mo d) (secondsToDiffTime 0)
+        RText str  -> return [Line time $ event speaker str]
+            where event = case pmState of
+                      PMNone      -> Message
+                      PMIsReceive -> PMReceive
+                      PMIsSend    -> PMSend
+        RNick str    -> do
+            modify (\st -> st { ircSpeaker = str, ircPMState = PMNone } )
+            return []
+        RTime h m pm -> do
+            modify (\st -> st { ircTime = newTime } )
+            return (if (dayTime' - dayTime) > 0 then [] else [Line newTime DateChange])
+            where (UTCTime day dayTime) = time
+                  dayTime'  = secondsToDiffTime $ fromIntegral (3600 * h + 60 * m + if pm then 12 * 3600 else 0)
+                  newTime   = if (dayTime' - dayTime) > 0
+                      then UTCTime day dayTime'
+                      else UTCTime (addDays 1 day) dayTime'
+        RRelTime int -> do
+            modifyTime newTime
+            return (if dayDiff == 0 then [] else [Line newTime DateChange])
+            where newTime = addUTCTime (fromIntegral $ int * 60) time
+                  dayDiff = diffDays (utctDay newTime) (utctDay time)
+        RCommand cmd -> case cmd of
+            CJoin nick       -> return [Line time $ Join nick "unknown@unknown"]
+            CQuit nick msg   -> return [Line time $ Quit nick "unknown@unknown" msg]
+            CNick nick nick' -> return [Line time $ NickChange nick nick']
+            CNoNick nick     -> return [Line time $ NoNick nick]
+            CCensored        -> return [Line time   Censored]
+            CMode ni mde hos -> return [Line time $ Mode ni mde hos]
+            CClose           -> return [Line time   LogClose]
+            COpen            -> return [Line time   LogOpen ]
+            -- TODO: hostnames
+        RPMReceive n -> modify (\st -> st { ircSpeaker = n, ircPMState = PMIsReceive } ) *> return []
+        RPMSend n    -> modify (\st -> st { ircSpeaker = n, ircPMState = PMIsSend } )    *> return []
+        RSnip        -> return [Snip]
+        REmpty       -> return []
+        RComment _   -> return []
+        RRaw str     -> return [Raw str]
+    return (ls ++ rawMod)
+
+data Warning = TimeTravelWarning Int deriving (Show)
