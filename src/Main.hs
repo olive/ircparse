@@ -6,7 +6,7 @@ import Processor
 import Printer
 
 import Data.ByteString hiding (unzip, map, concatMap, length, putStr, hPutStr)
-import System.IO (utf8, IOMode(..), Handle, openFile, hSetEncoding, hPutStr) 
+import System.IO (utf8, IOMode(..), Handle, openFile, hSetEncoding, hPutStr, withFile) 
 
 getUtf8Handle :: FilePath -> IOMode -> IO Handle
 getUtf8Handle fp iom = do
@@ -28,10 +28,12 @@ getRawLines fp = do
 
 writeLinesToFile :: FilePath -> [[(RawLine, Int)]] -> IO ()
 writeLinesToFile fp rawLines = do
-    handle <- getUtf8Handle fp WriteMode
+    -- handle <- getUtf8Handle fp WriteMode
     let (ls, warnings) = unzip . map processRawLines $ rawLines
     let outputString = concatMap showLines ls
-    hPutStr handle outputString
+    withFile fp WriteMode (\handle -> do
+        hSetEncoding handle utf8
+        hPutStr handle outputString )
     mapM_ (putStr . showWarnings) warnings
 
 main :: IO ()

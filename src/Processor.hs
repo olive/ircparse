@@ -40,7 +40,13 @@ processRawLines rl = (reverse ls, reverse $ ircWarnings st')
         processFun lns rawl = do
             newLs <- processRawLine rawl
             return (newLs ++ lns)
-        (ls, st') = runState (foldM processFun [] rl) defaultIRCState
+        processRls = do
+            lns <- foldM processFun [] rl
+            isRaw <- gets ircIsRaw
+            if not isRaw
+                then return (EndRaw : lns)
+                else return lns
+        (ls, st') = runState processRls defaultIRCState
 
 data PMState = PMNone | PMIsSend | PMIsReceive
 
@@ -66,7 +72,7 @@ processRawLine (rl, ln) = do
     rawMod <- case rl of
         RRaw _ -> if isRaw
             then return []
-            else modify (\st -> st { ircIsRaw = True } ) >> return [EndRaw]
+            else modify (\st -> st { ircIsRaw = True } ) >> return [EndRaw] -- BUG: this isn't really showing up
         _      -> if not isRaw
             then return []
             else modify (\st -> st { ircIsRaw = False } ) >> return [BeginRaw]
