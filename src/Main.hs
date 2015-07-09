@@ -5,7 +5,8 @@ import Parser
 import Processor
 import Printer
 
-import Data.ByteString hiding (unzip, map, concatMap, length, putStr, hPutStr)
+import Data.ByteString hiding (unzip, map, concatMap, length, putStr, hPutStr, putStrLn, head)
+import System.Environment (getArgs)
 import System.IO (utf8, IOMode(..), Handle, openFile, hSetEncoding, hPutStr, withFile) 
 
 getUtf8Handle :: FilePath -> IOMode -> IO Handle
@@ -37,4 +38,8 @@ writeLinesToFile fp rawLines = do
     mapM_ (putStr . showWarnings) warnings
 
 main :: IO ()
-main = writeLinesToFile "text.tex" =<< getRawLines "text.chattex"
+main = do
+    args <- getArgs
+    if length args < 2
+        then putStrLn "not enough arguments given"
+        else writeLinesToFile (args !! 1) =<< getRawLines (head args)
