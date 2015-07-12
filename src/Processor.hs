@@ -33,20 +33,31 @@ data Event = Message Nick String
            | LogOpen
            | Mode Nick String Hostname deriving (Show)
 
-processRawLines :: [(RawLine, Int)] -> ([Line], [Warning])
-processRawLines rl = (reverse ls, reverse $ ircWarnings st')
+processRawLineBatches :: [[(RawLine, Int)]] -> ([Line], [Warning])
+processRawLineBatches rlss = (concat . map reverse $ lss, reverse $ ircWarnings st')
     where
-        processFun :: [Line] -> (RawLine, Int) -> State IRCState [Line]
-        processFun lns rawl = do
-            newLs <- processRawLine rawl
-            return (newLs ++ lns)
-        processRls = do
-            lns <- foldM processFun [] rl
-            isRaw <- gets ircIsRaw
-            if not isRaw
-                then return (EndRaw : lns)
-                else return lns
-        (ls, st') = runState processRls defaultIRCState
+        processedBatches :: State IRCState [[Line]]
+        processedBatches = sequence (map (foldM processFun []) rlss)
+        (lss, st') = runState processedBatches defaultIRCState
+        ls = concat . map reverse $ lss
+
+processRawLines :: [(RawLine, Int)] -> ([Line], [Warning])
+processRawLines rls = (reverse ls, reverse $ ircWarnings st')
+    where
+        (ls, st') = runState (processRls rls) defaultIRCState
+
+processFun :: [Line] -> (RawLine, Int) -> State IRCState [Line]
+processFun lns rawl = do
+    newLs <- processRawLine rawl
+    return (newLs ++ lns)
+
+processRls :: [(RawLine, Int)] -> State IRCState [Line] 
+processRls rls = do
+    lns <- foldM processFun [] rls
+    isRaw <- gets ircIsRaw
+    if not isRaw
+        then return (EndRaw : lns)
+        else return lns
 
 data PMState = PMNone | PMIsSend | PMIsReceive
 

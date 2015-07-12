@@ -30,12 +30,12 @@ getRawLines fp = do
 writeLinesToFile :: FilePath -> [[(RawLine, Int)]] -> IO ()
 writeLinesToFile fp rawLines = do
     -- handle <- getUtf8Handle fp WriteMode
-    let (ls, warnings) = unzip . map processRawLines $ rawLines
-    let outputString = concatMap showLines ls
+    let (ls, warnings) = processRawLineBatches rawLines
+    let outputString = showLines ls
     withFile fp WriteMode (\handle -> do
         hSetEncoding handle utf8
         hPutStr handle outputString )
-    mapM_ (putStr . showWarnings) warnings
+    putStr . showWarnings $ warnings
 
 main :: IO ()
 main = do
