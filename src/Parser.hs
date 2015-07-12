@@ -38,16 +38,16 @@ data RawLine = RAction String
              | RRaw String deriving (Show)
 
 pFile :: Parser [[(RawLine, Int)]]
-pFile = (concat <$> many ((\a b -> [a,b]) <$> pRawLines <*> pIRCLines)) <* eof
+pFile = many1 (pRawLines <|> pIRCLines) <* eof
 
 pRawLines :: Parser [(RawLine, Int)]
-pRawLines = pRawLine `endBy` endOfLine
+pRawLines = pRawLine `endBy1` endOfLine
 
 pRawLine :: Parser (RawLine, Int)
 pRawLine = notFollowedBy (string "%%%") *> ((,) <$> (RRaw <$> pRestOfLine) <*> lineNumber)
 
 pIRCLines :: Parser [(RawLine, Int)]
-pIRCLines = pSectionSeperator *> (pIRCLine `endBy` endOfLine) <* pSectionSeperator
+pIRCLines = pSectionSeperator *> (pIRCLine `endBy1` endOfLine) <* pSectionSeperator
 
 pSectionSeperator :: Parser String
 pSectionSeperator = try (string "%%%") <* endOfLine
