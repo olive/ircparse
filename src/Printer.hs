@@ -11,8 +11,8 @@ showLines = unlines . map showLine
 
 showLine :: Line -> String
 showLine Snip              = "\n***SNIP***\n"
-showLine BeginRaw          = "\\begin{verbatim}"
-showLine EndRaw            = "\\end{verbatim}"
+showLine BeginRaw          = "\\begin{lstlisting}"
+showLine EndRaw            = "\\end{lstlisting}"
 showLine (Raw str)         = str
 showLine (Line time event) = case event of
     Action nick str  -> unwords [ showTimeStamp time
