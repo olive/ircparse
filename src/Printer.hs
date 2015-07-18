@@ -11,7 +11,7 @@ showLines = unlines . map showLine
 
 showLine :: Line -> String
 showLine Snip              = "\n***SNIP***\n"
-showLine BeginRaw          = "\\begin{lstlisting}"
+showLine BeginRaw          = "\\begin{lstlisting}[escapechar=~]"
 showLine EndRaw            = "\\end{lstlisting}"
 showLine (Raw str)         = str
 showLine (Line time event) = case event of
